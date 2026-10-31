@@ -1,0 +1,46 @@
+[project]
+name = "sustainable-reverse-logistics"
+version = "2.0.0"
+description = "Sustainable Reverse Logistics Management Platform"
+authors = [{ name = "Senior QA Engineer" }]
+dependencies = [
+    "fastapi>=0.110.0",
+    "uvicorn>=0.28.0",
+    "sqlalchemy>=2.0.0",
+    "psycopg2-binary>=2.9.0",
+    "pydantic>=2.6.0",
+    "pydantic-settings>=2.2.0",
+    "bcrypt>=4.1.0",
+    "pyjwt>=2.8.0",
+    "python-multipart>=0.0.9",
+    "requests>=2.31.0",
+    "streamlit>=1.32.0",
+    "pandas>=2.2.0"
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::starlette.exceptions.StarletteDeprecationWarning"
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+exclude = [
+    ".venv",
+    ".git",
+    "__pycache__",
+    "build",
+    "dist",
+    "legacy-prototype"
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+ignore = [
+    "E501",  # line too long
+    "B008",  # Depends in argument default
+]
