@@ -3,7 +3,11 @@ from typing import Any, Dict, List, Optional
 
 import requests
 
-API_BASE = os.getenv("BACKEND_API_URL", "http://127.0.0.1:8000")
+API_BASE = (
+    os.getenv("BACKEND_API_URL")
+    or os.getenv("API_BASE_URL")
+    or "http://127.0.0.1:8000"
+).rstrip("/")
 
 class ApiClient:
     def __init__(self, base_url: str = API_BASE):
