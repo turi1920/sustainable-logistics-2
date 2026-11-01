@@ -44,6 +44,19 @@ def test_invalid_workflow_transitions(client):
     assert restock_resp.status_code == 400
     assert "Invalid workflow transition" in restock_resp.json()["detail"]
 
+def test_cannot_receive_return_before_pickup(client):
+    """Phase-wise consistency: A return cannot be received at the warehouse before it has been picked up."""
+    admin_token = get_token(client, "admin", "Admin123!")
+
+    # RET-1001 is seeded in RETURN_REQUESTED with pickup_status=ASSIGNED (not collected yet)
+    recv_resp = client.post(
+        "/api/returns/RET-1001/receive",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={"serial_received": "SN-PXL-78901", "storage_location": "Bin W-105"}
+    )
+    assert recv_resp.status_code == 400
+    assert "Phase Sequencing Violation" in recv_resp.json()["detail"]
+
 def test_data_sanitization_gate_rejection(client):
     """Requirement 11: Data sanitization gate must block QC if sanitization failed."""
     admin_token = get_token(client, "admin", "Admin123!")
@@ -61,6 +74,13 @@ def test_data_sanitization_gate_rejection(client):
         }
     )
     assert reg.status_code == 201
+
+    # Pickup first (phase-wise consistency)
+    client.post(
+        "/api/returns/RET-SAN-TEST/confirm-pickup",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={"picked_up_notes": "Collected from customer"}
+    )
 
     # Receive
     client.post("/api/returns/RET-SAN-TEST/receive", headers={"Authorization": f"Bearer {admin_token}"}, json={"serial_received": "SN-1", "storage_location": "B1"})

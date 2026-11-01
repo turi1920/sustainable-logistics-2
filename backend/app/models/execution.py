@@ -11,7 +11,7 @@ class ProcessingTask(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     return_id = Column(String(50), ForeignKey("returns.id", ondelete="CASCADE"), unique=True, nullable=False)
-    performed_by_user_id = Column(Integer, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    performed_by_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     work_performed = Column(Text, nullable=False)
     actual_repair_cost = Column(Numeric(10, 2), nullable=False, default=0.00)
     actual_packaging_cost = Column(Numeric(10, 2), nullable=False, default=0.00)
@@ -28,7 +28,7 @@ class QualityCheck(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     return_id = Column(String(50), ForeignKey("returns.id", ondelete="CASCADE"), unique=True, nullable=False)
-    checked_by_user_id = Column(Integer, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    checked_by_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     functional_qc_passed = Column(Boolean, default=True, nullable=False)
     cosmetic_grade = Column(String(50), nullable=False, default="GRADE_A")  # GRADE_A, GRADE_B, GRADE_C
     sanitization_passed = Column(Boolean, default=True, nullable=False)
@@ -45,7 +45,7 @@ class Disposition(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     return_id = Column(String(50), ForeignKey("returns.id", ondelete="CASCADE"), unique=True, nullable=False)
-    handled_by_user_id = Column(Integer, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    handled_by_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     disposition_type = Column(String(50), nullable=False)  # RESTOCKED, RETURNED_TO_RETAILER
     inventory_location = Column(String(100), nullable=True)
     realized_resale_value = Column(Numeric(10, 2), nullable=False, default=0.00)

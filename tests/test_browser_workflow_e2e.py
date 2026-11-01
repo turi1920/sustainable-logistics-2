@@ -1,8 +1,17 @@
 import time
 
+import pytest
 from playwright.sync_api import sync_playwright
 
+from backend.scripts.seed import seed_demo_data
+
 FRONTEND_URL = "http://localhost:8501"
+
+@pytest.fixture(autouse=True)
+def clean_db():
+    seed_demo_data(reset=True)
+    yield
+    seed_demo_data(reset=True)
 
 def test_full_browser_ui_lifecycle():
     with sync_playwright() as p:
@@ -32,8 +41,13 @@ def test_full_browser_ui_lifecycle():
         page.get_by_role("tab", name="Register New Return").click()
         time.sleep(1)
 
+        # Verify Return Case ID is automatically generated and non-editable (primary key)
+        ret_id_elem = page.locator("input[aria-label='Return Case ID (Auto-Generated)']")
+        auto_case_id = ret_id_elem.input_value()
+        assert auto_case_id.startswith("RET-")
+        assert ret_id_elem.is_disabled()
+
         # Fill smartphone return form
-        page.fill("input[aria-label='Custom Return ID (Optional)']", "RET-UI-SMP-881")
         page.fill("input[aria-label='Order Reference']", "ORD-UI-8899")
         page.fill("input[aria-label='Product Model / Name']", "Apple iPhone 14 Pro 128GB Space Black")
         page.fill("input[aria-label='SKU']", "IPH-14P-128SB")
@@ -43,11 +57,36 @@ def test_full_browser_ui_lifecycle():
         page.click("button:has-text('Submit Return Registration')")
         time.sleep(2)
         body = page.inner_text("body")
-        assert "Successfully registered Return Case" in body or "RET-UI-SMP-881" in body
-        print("PASSED: Admin registered smartphone return RET-UI-SMP-881")
+        assert "Successfully registered Return Case" in body
+        assert auto_case_id in body
+        print(f"PASSED: Admin registered smartphone return {auto_case_id}")
 
-        # Step 2: Warehouse confirms receipt
-        print("UI Step 2: Warehouse confirms receipt...")
+        # Step 2: Phase-Wise Logistics Gate & Driver Pickup
+        print("UI Step 2: Verify warehouse cannot receive before pickup, then driver collects...")
+        # 2a. Warehouse logs in and verifies intake is blocked before pickup
+        page.click("button:has-text('Logout')")
+        time.sleep(1)
+        page.fill("input[aria-label='Username or Email']", "warehouse")
+        page.fill("input[aria-label='Password']", "Warehouse123!")
+        page.click("button:has-text('Sign In')")
+        time.sleep(2)
+        wh_body_before = page.inner_text("body")
+        assert "Phase Sequencing Requirement" in wh_body_before or "Awaiting Pickup" in wh_body_before
+        print("PASSED: Warehouse intake correctly blocked pending driver collection")
+
+        # 2b. Driver logs in and confirms physical doorstep pickup
+        page.click("button:has-text('Logout')")
+        time.sleep(1)
+        page.fill("input[aria-label='Username or Email']", "driver_eco")
+        page.fill("input[aria-label='Password']", "Pickup123!")
+        page.click("button:has-text('Sign In')")
+        time.sleep(2)
+        page.click("button:has-text('Confirm Doorstep Physical Pickup')")
+        time.sleep(2)
+        page.wait_for_load_state("networkidle")
+        print("PASSED: EcoLogix Driver confirmed doorstep pickup")
+
+        # 2c. Warehouse logs in and confirms intake receipt (now enabled)
         page.click("button:has-text('Logout')")
         time.sleep(1)
         page.fill("input[aria-label='Username or Email']", "warehouse")
@@ -62,7 +101,7 @@ def test_full_browser_ui_lifecycle():
         time.sleep(2)
         body = page.inner_text("body")
         assert "Warehouse receipt confirmed" in body
-        print("PASSED: Warehouse receipt confirmed")
+        print("PASSED: Warehouse receipt confirmed after driver pickup")
 
         # Step 3: Inspector conducts inspection & generates recovery options
         print("UI Step 3: Inspector conducts technical inspection...")
@@ -148,9 +187,15 @@ def test_full_browser_ui_lifecycle():
         print("UI Step 8: Verifying complete return journey...")
         page.get_by_role("tab", name="Case Traceability").click()
         time.sleep(1)
-        page.fill("input[aria-label='Enter Return Case ID or Serial Number']", "RET-1003")
+        page.fill("input[aria-label='Enter Return Case ID or Serial Number']", auto_case_id)
         page.click("button:has-text('Search Case')")
         time.sleep(2)
+
+        # Ensure Case Traceability tab is focused
+        trace_tab = page.get_by_role("tab", name="Case Traceability")
+        if trace_tab.is_visible():
+            trace_tab.click()
+            time.sleep(1)
 
         body = page.inner_text("body")
         assert "COMPLETED" in body

@@ -11,7 +11,7 @@ class Assessment(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     return_id = Column(String(50), ForeignKey("returns.id", ondelete="CASCADE"), unique=True, nullable=False)
-    inspector_id = Column(Integer, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    inspector_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     physical_condition = Column(String(50), nullable=False)  # GOOD, LOW_DAMAGE, MEDIUM_DAMAGE, HIGH_DAMAGE
     screen_condition = Column(String(100), nullable=True)
     battery_health_pct = Column(Integer, nullable=True)

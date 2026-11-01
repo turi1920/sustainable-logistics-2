@@ -34,12 +34,14 @@ def login(request: LoginRequest, db: Session = Depends(get_db)):
         )
 
     org_name = user.organization.name if user.organization else None
+    partner_name = user.pickup_partner.name if user.pickup_partner else None
 
     access_token = create_access_token(
         data={
             "sub": user.username,
             "role": user.role,
             "organization_id": user.organization_id,
+            "pickup_partner_id": user.pickup_partner_id,
             "user_id": user.id
         }
     )
@@ -50,12 +52,15 @@ def login(request: LoginRequest, db: Session = Depends(get_db)):
         role=user.role,
         username=user.username,
         organization_id=user.organization_id,
-        organization_name=org_name
+        organization_name=org_name,
+        pickup_partner_id=user.pickup_partner_id,
+        pickup_partner_name=partner_name
     )
 
 @router.get("/me", response_model=UserResponse)
 def get_current_user_profile(current_user: User = Depends(get_current_user)):
     org_name = current_user.organization.name if current_user.organization else None
+    partner_name = current_user.pickup_partner.name if current_user.pickup_partner else None
     return UserResponse(
         id=current_user.id,
         username=current_user.username,
@@ -64,6 +69,8 @@ def get_current_user_profile(current_user: User = Depends(get_current_user)):
         role=current_user.role,
         organization_id=current_user.organization_id,
         organization_name=org_name,
+        pickup_partner_id=current_user.pickup_partner_id,
+        pickup_partner_name=partner_name,
         is_active=current_user.is_active,
         created_at=current_user.created_at
     )

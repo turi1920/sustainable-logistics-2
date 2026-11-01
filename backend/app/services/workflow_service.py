@@ -43,12 +43,32 @@ def receive_return(
     actor: User
 ) -> ReturnRequest:
     validate_transition(return_obj.status, "RECEIVED")
+
+    # Phase sequencing check: Product must be picked up first
+    if return_obj.pickup_status in ["PENDING_ASSIGNMENT", "ASSIGNED", "PICKUP_FAILED", "RESCHEDULED"]:
+        labels = {
+            "PENDING_ASSIGNMENT": "Pending Carrier Assignment",
+            "ASSIGNED": "Assigned (Awaiting Doorstep Pickup)",
+            "PICKUP_FAILED": "Pickup Attempt Failed (Customer Exception / Undelivered)",
+            "RESCHEDULED": "Pickup Rescheduled (Awaiting New Collection Date)",
+        }
+        status_label = labels.get(return_obj.pickup_status, return_obj.pickup_status)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Phase Sequencing Violation: Return case '{return_obj.id}' cannot be received at the warehouse "
+                f"because the product has not been picked up from the customer yet (Current status: {status_label}). "
+                "The product must be successfully picked up by the logistics carrier first before warehouse receipt can be confirmed."
+            )
+        )
+
     old_status = return_obj.status
     return_obj.status = "RECEIVED"
     return_obj.serial_received = serial_received
     return_obj.storage_location = storage_location
     return_obj.package_condition = package_condition
     return_obj.received_at = datetime.utcnow()
+    return_obj.pickup_status = "DELIVERED_TO_WAREHOUSE"
 
     details = f"Received at location {storage_location}. Package condition: {package_condition}. Serial verified: {serial_received}."
     record_status_change(db, return_obj.id, old_status, "RECEIVED", actor, "CONFIRM_WAREHOUSE_RECEIPT", details)
@@ -84,8 +104,13 @@ def conduct_inspection(
     )
     db.add(assessment)
 
-    # Generate and store cost estimates
-    base_resale = Decimal("400.00") if return_obj.product_category == "Smartphone" else Decimal("150.00")
+    # Generate and store cost estimates in Indian Rupees (INR)
+    if return_obj.product_category == "Smartphone":
+        base_resale = Decimal("32000.00")
+    elif return_obj.product_category == "Laptop":
+        base_resale = Decimal("48000.00")
+    else:
+        base_resale = Decimal("12000.00")
     estimates_data = generate_recovery_options(
         product_category=return_obj.product_category,
         base_resale_value=base_resale,
@@ -179,7 +204,7 @@ def execute_processing(
     db.add(task)
 
     return_obj.status = "PROCESSING_COMPLETED"
-    details = f"Processing finished: '{work_performed}'. Total actual cost: ${total_actual:.2f}."
+    details = f"Processing finished: '{work_performed}'. Total actual cost: ₹{total_actual:.2f}."
     record_status_change(db, return_obj.id, old_status, "PROCESSING_COMPLETED", actor, "COMPLETE_PROCESSING", details)
     db.commit()
     db.refresh(return_obj)
@@ -253,7 +278,7 @@ def finalize_disposition(
     db.add(disp)
 
     return_obj.status = "COMPLETED"
-    details = f"Disposition completed: {target_status}. Location: {inventory_location}. Realized value: ${realized_resale_value:.2f}. Notes: {notes or 'None'}."
+    details = f"Disposition completed: {target_status}. Location: {inventory_location}. Realized value: ₹{realized_resale_value:.2f}. Notes: {notes or 'None'}."
     record_status_change(db, return_obj.id, old_status, "COMPLETED", actor, f"DISPOSITION_{target_status}", details)
     db.commit()
     db.refresh(return_obj)

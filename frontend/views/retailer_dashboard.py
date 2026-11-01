@@ -3,6 +3,7 @@ import streamlit as st
 
 from frontend.api_client import api_client
 from frontend.views.return_journey import render_return_journey
+from frontend.views.sustainability_dashboard import render_sustainability_tab
 
 
 def render_retailer_dashboard(token: str, user: dict):
@@ -10,9 +11,12 @@ def render_retailer_dashboard(token: str, user: dict):
     org_name = user.get("organization_name") or "Retailer Partner"
     st.caption(f"Organization: **{org_name}** | User: **{user['full_name']}** (`{user['username']}`)")
 
+    if "retailer_flash_msg" in st.session_state:
+        st.success(st.session_state.pop("retailer_flash_msg"))
+
     st.info(f"🔒 Tenant Isolation Active: Viewing records exclusively for **{org_name}**.")
 
-    tabs = st.tabs(["⏳ Pending Recovery Approvals", "📋 All Retailer Returns", "🔍 Return Case Journey"])
+    tabs = st.tabs(["⏳ Pending Recovery Approvals", "📋 All Retailer Returns", "🌱 Sustainability Impact", "🔍 Return Case Journey"])
 
     # Tab 1: Pending Approvals
     with tabs[0]:
@@ -58,12 +62,12 @@ def render_retailer_dashboard(token: str, user: dict):
                     rec_badge = " ⭐ (System Recommended)" if ce["is_recommended"] else ""
                     table_rows.append({
                         "Option": ce["option_type"] + rec_badge,
-                        "Est. Resale": f"${float(ce['estimated_resale_value']):.2f}",
-                        "Repair / Work": f"${float(ce['estimated_repair_cost']):.2f}",
-                        "Transport": f"${float(ce['estimated_transport_cost']):.2f}",
-                        "Packaging": f"${float(ce['estimated_packaging_cost']):.2f}",
-                        "Sanitization": f"${float(ce['estimated_sanitization_cost']):.2f}",
-                        "Expected NRV": f"${float(ce['estimated_nrv']):.2f}",
+                        "Est. Resale": f"₹{float(ce['estimated_resale_value']):.2f}",
+                        "Repair / Work": f"₹{float(ce['estimated_repair_cost']):.2f}",
+                        "Transport": f"₹{float(ce['estimated_transport_cost']):.2f}",
+                        "Packaging": f"₹{float(ce['estimated_packaging_cost']):.2f}",
+                        "Sanitization": f"₹{float(ce['estimated_sanitization_cost']):.2f}",
+                        "Expected NRV": f"₹{float(ce['estimated_nrv']):.2f}",
                         "CO2 Saved": f"{float(ce['co2_saved_kg']):.1f} kg"
                     })
                 st.table(pd.DataFrame(table_rows))
@@ -77,7 +81,6 @@ def render_retailer_dashboard(token: str, user: dict):
                 st.markdown("##### ✍️ Authorization Decision")
                 eligible_options = [c["option_type"] for c in estimates] if estimates else ["REFURBISH", "REPAIR", "RESALE_AS_IS", "RETURN_TO_RETAILER", "RECYCLE"]
 
-                decision_action = st.radio("Decision", ["APPROVED", "REJECTED"], index=0)
                 selected_opt = st.selectbox("Approved Recovery Route", eligible_options, index=0)
                 remarks = st.text_input("Decision Notes / Authorization Reference", value="Approved for high-yield refurbishment and local certified resale.")
 
@@ -85,13 +88,17 @@ def render_retailer_dashboard(token: str, user: dict):
 
                 if submit_dec:
                     payload = {
-                        "decision": decision_action,
+                        "decision": "APPROVED",
                         "approved_option": selected_opt,
                         "remarks": remarks
                     }
                     try:
                         res = api_client.decide_return(token, ret_detail["id"], payload)
-                        st.success(f"✅ Authorization submitted for **{res['id']}**! Status updated to `{res['status']}`.")
+                        st.session_state["retailer_flash_msg"] = (
+                            f"✅ Authorization submitted for **{res['id']}**! "
+                            f"Approved route: `{selected_opt}`. Status updated to `{res['status']}`."
+                        )
+                        st.rerun()
                     except Exception as e:
                         st.error(f"Decision submission failed: {e}")
 
@@ -109,12 +116,16 @@ def render_retailer_dashboard(token: str, user: dict):
                     "Status": r["status"],
                     "Created At": r["created_at"][:19]
                 } for r in my_returns])
-                st.dataframe(df, use_container_width=True)
+                st.dataframe(df, width="stretch")
             else:
                 st.info("No returns logged for this retailer.")
         except Exception as e:
             st.error(f"Failed to load returns: {e}")
 
-    # Tab 3: Case Search
+    # Tab 3: Sustainability Impact
     with tabs[2]:
+        render_sustainability_tab(token, user, organization_id=user.get("organization_id"))
+
+    # Tab 4: Case Search
+    with tabs[3]:
         render_return_journey(token)

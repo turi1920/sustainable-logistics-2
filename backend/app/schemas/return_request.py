@@ -15,6 +15,14 @@ class ReturnCreate(BaseModel):
     serial_expected: Optional[str] = None
     customer_pincode: Optional[str] = None
     return_reason: Optional[str] = None
+    pickup_partner_id: Optional[int] = None
+    assigned_driver_id: Optional[int] = None
+
+class PickupAssignment(BaseModel):
+    pickup_partner_id: Optional[int] = None
+    assigned_driver_id: Optional[int] = None
+    scheduled_date: Optional[datetime] = None
+    notes: Optional[str] = None
 
 class ReturnReceive(BaseModel):
     serial_received: str
@@ -121,11 +129,28 @@ class ReturnResponse(BaseModel):
     status: str
     storage_location: Optional[str] = None
     package_condition: Optional[str] = None
+    pickup_partner_id: Optional[int] = None
+    pickup_partner_name: Optional[str] = None
+    pickup_status: str = "PENDING_ASSIGNMENT"
+    pickup_scheduled_date: Optional[datetime] = None
+    pickup_notes: Optional[str] = None
+    claimed_by_user_id: Optional[int] = None
+    claimed_by_username: Optional[str] = None
+    claimed_by_name: Optional[str] = None
+    claimed_at: Optional[datetime] = None
+    claim_expires_at: Optional[datetime] = None
+    is_claimed: bool = False
+    assigned_driver_id: Optional[int] = None
+    assigned_driver_name: Optional[str] = None
+    assigned_driver_username: Optional[str] = None
     received_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+class DriverTaskActionRequest(BaseModel):
+    reason: Optional[str] = None
 
 class ReturnDetailResponse(ReturnResponse):
     assessment: Optional[AssessmentItem] = None

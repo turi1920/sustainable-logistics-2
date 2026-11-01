@@ -1,7 +1,17 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.app.api import auth, inspection, organizations, retailer, returns, warehouse
+from backend.app.api import (
+    auth,
+    inspection,
+    organizations,
+    pickup_partners,
+    retailer,
+    returns,
+    sustainability,
+    users,
+    warehouse,
+)
 from backend.app.database import Base, engine
 
 # Create database tables if not existing
@@ -22,11 +32,14 @@ app.add_middleware(
 )
 
 app.include_router(auth.router)
+app.include_router(users.router)
+app.include_router(pickup_partners.router)
 app.include_router(returns.router)
 app.include_router(warehouse.router)
 app.include_router(inspection.router)
 app.include_router(retailer.router)
 app.include_router(organizations.router)
+app.include_router(sustainability.router)
 
 @app.get("/health")
 @app.get("/api/v1/health")

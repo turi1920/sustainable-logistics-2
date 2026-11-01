@@ -52,3 +52,14 @@ def validate_retailer_access(current_user: User, return_obj: ReturnRequest) -> N
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Access denied: You do not have permission to access records belonging to another retailer organization."
             )
+
+def validate_partner_access(current_user: User, return_obj: ReturnRequest) -> None:
+    """Enforces multi-tenant carrier isolation for pickup partners.
+    If the user has role PICKUP_PARTNER, they can ONLY access returns assigned to their carrier.
+    """
+    if current_user.role == "PICKUP_PARTNER":
+        if return_obj.pickup_partner_id != current_user.pickup_partner_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: You do not have permission to access shipments assigned to another pickup carrier."
+            )

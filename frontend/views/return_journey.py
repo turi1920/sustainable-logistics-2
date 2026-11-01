@@ -8,11 +8,16 @@ from frontend.api_client import api_client
 def render_return_journey(token: str, default_return_id: str = ""):
     st.subheader("🔍 Return Case Journey & Audit Timeline")
 
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        search_query = st.text_input("Enter Return Case ID or Serial Number", value=default_return_id, key="journey_search_input")
-    with col2:
-        st.button("Search Case", key="journey_search_btn")
+    with st.form("journey_search_form"):
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            search_query = st.text_input(
+                "Enter Return Case ID or Serial Number",
+                value=default_return_id,
+                key="journey_search_input",
+            )
+        with col2:
+            st.form_submit_button("Search Case", use_container_width=True)
 
     if not search_query:
         st.info("Enter a return case ID (e.g. `RET-1001`, `RET-1003`) to view its end-to-end lifecycle.")
@@ -29,15 +34,25 @@ def render_return_journey(token: str, default_return_id: str = ""):
     st.markdown(f"### Return Case: **{ret['id']}** — *{ret['product_name']}*")
 
     # Metadata Overview
-    mcol1, mcol2, mcol3, mcol4 = st.columns(4)
+    mcol1, mcol2, mcol3, mcol4, mcol5 = st.columns(5)
     with mcol1:
         st.metric("Status", ret["status"])
     with mcol2:
         st.metric("Retailer Organization", ret.get("organization_name", "N/A"))
     with mcol3:
-        st.metric("Storage Location", ret.get("storage_location") or "Not yet assigned")
+        st.metric("Pickup Partner", ret.get("pickup_partner_name") or "Unassigned")
     with mcol4:
+        st.metric("Storage Location", ret.get("storage_location") or "Not yet assigned")
+    with mcol5:
         st.metric("Order Reference", ret.get("order_ref") or "N/A")
+
+    if ret.get("pickup_partner_name"):
+        pickup_info_text = f"🚚 **Assigned Logistics Partner:** **{ret['pickup_partner_name']}** | **Status:** `{ret.get('pickup_status', 'ASSIGNED')}`"
+        if ret.get("pickup_scheduled_date"):
+            pickup_info_text += f" | **Scheduled Date:** {ret['pickup_scheduled_date'][:10]}"
+        if ret.get("pickup_notes"):
+            pickup_info_text += f" | **Instructions:** *{ret['pickup_notes']}*"
+        st.info(pickup_info_text)
 
     tab_timeline, tab_costs, tab_env, tab_assessment, tab_execution = st.tabs([
         "📜 Audit Timeline",
@@ -70,11 +85,11 @@ def render_return_journey(token: str, default_return_id: str = ""):
                 for ce in ret["cost_estimates"]:
                     est_data.append({
                         "Option": ce["option_type"] + (" ⭐ Recommended" if ce["is_recommended"] else ""),
-                        "Est. Resale": f"${float(ce['estimated_resale_value']):.2f}",
-                        "Repair": f"${float(ce['estimated_repair_cost']):.2f}",
-                        "Transport": f"${float(ce['estimated_transport_cost']):.2f}",
-                        "Sanitization": f"${float(ce['estimated_sanitization_cost']):.2f}",
-                        "NRV": f"${float(ce['estimated_nrv']):.2f}"
+                        "Est. Resale": f"₹{float(ce['estimated_resale_value']):.2f}",
+                        "Repair": f"₹{float(ce['estimated_repair_cost']):.2f}",
+                        "Transport": f"₹{float(ce['estimated_transport_cost']):.2f}",
+                        "Sanitization": f"₹{float(ce['estimated_sanitization_cost']):.2f}",
+                        "NRV": f"₹{float(ce['estimated_nrv']):.2f}"
                     })
                 st.table(pd.DataFrame(est_data))
             else:
@@ -86,16 +101,16 @@ def render_return_journey(token: str, default_return_id: str = ""):
             disp = ret.get("disposition")
             if pt:
                 actual_data = [
-                    {"Cost Element": "Actual Repair & Parts", "Amount": f"${float(pt['actual_repair_cost']):.2f}"},
-                    {"Cost Element": "Actual Packaging", "Amount": f"${float(pt['actual_packaging_cost']):.2f}"},
-                    {"Cost Element": "Actual Labor / Sanitization", "Amount": f"${float(pt['actual_labor_cost']):.2f}"},
-                    {"Cost Element": "Actual Transport", "Amount": f"${float(pt['actual_transport_cost']):.2f}"},
-                    {"Cost Element": "TOTAL ACTUAL COST", "Amount": f"${float(pt['total_actual_cost']):.2f}"},
+                    {"Cost Element": "Actual Repair & Parts", "Amount": f"₹{float(pt['actual_repair_cost']):.2f}"},
+                    {"Cost Element": "Actual Packaging", "Amount": f"₹{float(pt['actual_packaging_cost']):.2f}"},
+                    {"Cost Element": "Actual Labor / Sanitization", "Amount": f"₹{float(pt['actual_labor_cost']):.2f}"},
+                    {"Cost Element": "Actual Transport", "Amount": f"₹{float(pt['actual_transport_cost']):.2f}"},
+                    {"Cost Element": "TOTAL ACTUAL COST", "Amount": f"₹{float(pt['total_actual_cost']):.2f}"},
                 ]
                 if disp:
-                    actual_data.append({"Cost Element": "Realized Resale Value", "Amount": f"${float(disp['realized_resale_value']):.2f}"})
+                    actual_data.append({"Cost Element": "Realized Resale Value", "Amount": f"₹{float(disp['realized_resale_value']):.2f}"})
                     net_actual = float(disp['realized_resale_value']) - float(pt['total_actual_cost'])
-                    actual_data.append({"Cost Element": "REALIZED NET RECOVERY", "Amount": f"${net_actual:.2f}"})
+                    actual_data.append({"Cost Element": "REALIZED NET RECOVERY", "Amount": f"₹{net_actual:.2f}"})
                 st.table(pd.DataFrame(actual_data))
             else:
                 st.info("No processing task completed yet; actual costs will be logged upon execution.")
@@ -143,4 +158,4 @@ def render_return_journey(token: str, default_return_id: str = ""):
 
         if disp:
             st.success(f"**Final Disposition:** `{disp['disposition_type']}` at `{disp.get('inventory_location')}`")
-            st.write(f"**Realized Resale Value:** ${float(disp['realized_resale_value']):.2f}")
+            st.write(f"**Realized Resale Value:** ₹{float(disp['realized_resale_value']):.2f}")

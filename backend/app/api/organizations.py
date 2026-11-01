@@ -23,5 +23,5 @@ def list_organizations(
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
-    orgs = db.query(Organization).order_by(Organization.name.asc()).all()
+    orgs = db.query(Organization).order_by(Organization.id.asc()).all()
     return orgs

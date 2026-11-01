@@ -3,6 +3,7 @@ import streamlit as st
 from frontend.api_client import api_client
 from frontend.views.admin_dashboard import render_admin_dashboard
 from frontend.views.inspector_dashboard import render_inspector_dashboard
+from frontend.views.pickup_dashboard import render_pickup_dashboard
 from frontend.views.retailer_dashboard import render_retailer_dashboard
 from frontend.views.warehouse_dashboard import render_warehouse_dashboard
 
@@ -62,6 +63,8 @@ if not st.session_state.token or not st.session_state.user:
                             st.session_state.current_view = "Inspector Dashboard"
                         elif role == "RETAILER":
                             st.session_state.current_view = "Retailer Portal"
+                        elif role == "PICKUP_PARTNER":
+                            st.session_state.current_view = "Pickup Partner Portal"
 
                         st.success(f"Welcome, {user_profile['full_name']}!")
                         st.rerun()
@@ -72,13 +75,15 @@ if not st.session_state.token or not st.session_state.user:
         st.subheader("🔑 Documented Demo Accounts")
         st.info(
             """
-            | Role | Username | Password | Organization | Scope |
+            | Role | Username | Password | Organization / Carrier | Scope |
             | :--- | :--- | :--- | :--- | :--- |
             | **Admin** | `admin` | `Admin123!` | Logistics Central | Full Platform Admin |
             | **Warehouse** | `warehouse` | `Warehouse123!` | Logistics Central | Intake & Restock |
             | **Inspector** | `inspector` | `Inspector123!` | Logistics Central | Inspect, Estimate, QC |
             | **Retailer 1** | `retailer_tech` | `Retailer123!` | TechRetail Direct | Org 1 Returns Only |
             | **Retailer 2** | `retailer_apex` | `Retailer123!` | Apex Mobile | Org 2 Returns Only |
+            | **Pickup Driver 1** | `driver_eco` | `Pickup123!` | EcoLogix Express | Doorstep Pickup & Transit |
+            | **Pickup Driver 2** | `driver_green` | `Pickup123!` | GreenRoute 3PL | Doorstep Pickup & Transit |
             """
         )
         st.caption("All accounts use secure bcrypt password hashing and RBAC authorization.")
@@ -96,19 +101,29 @@ else:
         st.markdown(f"**Role:** `{role}`")
         if user.get("organization_name"):
             st.markdown(f"**Organization:** {user['organization_name']}")
+        if user.get("pickup_partner_name"):
+            st.markdown(f"**Carrier:** {user['pickup_partner_name']}")
 
         st.markdown("---")
 
         # Navigation with Strict RBAC Route Protection
         available_views = []
         if role == "ADMIN":
-            available_views = ["Admin Dashboard", "Warehouse Dashboard", "Inspector Dashboard", "Retailer Portal"]
+            available_views = [
+                "Admin Dashboard",
+                "Warehouse Dashboard",
+                "Inspector Dashboard",
+                "Retailer Portal",
+                "Pickup Partner Portal"
+            ]
         elif role == "WAREHOUSE":
             available_views = ["Warehouse Dashboard"]
         elif role == "INSPECTOR":
             available_views = ["Inspector Dashboard"]
         elif role == "RETAILER":
             available_views = ["Retailer Portal"]
+        elif role == "PICKUP_PARTNER":
+            available_views = ["Pickup Partner Portal"]
 
         # Ensure current view matches allowed role
         if st.session_state.current_view not in available_views:
@@ -151,3 +166,9 @@ else:
             st.error("⛔ Access Denied: Retailer role required.")
         else:
             render_retailer_dashboard(token, user)
+
+    elif current_view == "Pickup Partner Portal":
+        if role not in ["PICKUP_PARTNER", "ADMIN"]:
+            st.error("⛔ Access Denied: Pickup Partner role required.")
+        else:
+            render_pickup_dashboard(token, user)

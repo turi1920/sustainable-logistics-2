@@ -6,12 +6,14 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../.
 from datetime import datetime
 from decimal import Decimal
 
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from backend.app.core.security import hash_password
 from backend.app.database import SessionLocal
 from backend.app.models.assessment import Assessment, CostEstimate
 from backend.app.models.audit import ReturnStatusHistory
+from backend.app.models.pickup_partner import PickupPartner
 from backend.app.models.return_request import ReturnRequest
 from backend.app.models.user import Organization, User
 from backend.app.services.recovery_policy_service import generate_recovery_options
@@ -27,8 +29,16 @@ def seed_demo_data(target_session=None, reset=False):
             db.query(Assessment).delete()
             db.query(ReturnRequest).delete()
             db.query(User).delete()
+            db.query(PickupPartner).delete()
             db.query(Organization).delete()
             db.commit()
+            try:
+                db.execute(text("ALTER SEQUENCE IF EXISTS pickup_partners_id_seq RESTART WITH 1;"))
+                db.execute(text("ALTER SEQUENCE IF EXISTS organizations_id_seq RESTART WITH 1;"))
+                db.execute(text("ALTER SEQUENCE IF EXISTS users_id_seq RESTART WITH 1;"))
+                db.commit()
+            except Exception:
+                pass
 
         print("Seeding Organizations...")
         org1 = db.query(Organization).filter(Organization.name == "TechRetail Direct").first()
@@ -46,6 +56,36 @@ def seed_demo_data(target_session=None, reset=False):
             org_platform = Organization(id=3, name="Reverse Logistics Central", org_type="PLATFORM", contact_email="admin@logistics.example")
             db.add(org_platform)
         db.commit()
+
+        print("Seeding Pickup Partners...")
+        p1 = db.query(PickupPartner).filter(PickupPartner.name == "EcoLogix Express").first()
+        if not p1:
+            p1 = PickupPartner(
+                name="EcoLogix Express",
+                contact_name="Rohit Sharma",
+                contact_email="dispatch@ecologix.example",
+                contact_phone="+1-800-ECO-LOGIX",
+                service_regions="Metro Hubs & Suburban Zones",
+                fleet_type="Electric Van (Zero-Emission)",
+                active=True
+            )
+            db.add(p1)
+
+        p2 = db.query(PickupPartner).filter(PickupPartner.name == "GreenRoute 3PL").first()
+        if not p2:
+            p2 = PickupPartner(
+                name="GreenRoute 3PL",
+                contact_name="Sarah Jenkins",
+                contact_email="ops@greenroute.example",
+                contact_phone="+1-888-GRN-ROUTE",
+                service_regions="Nationwide Regional Corridors",
+                fleet_type="CNG / Hybrid Cargo Van",
+                active=True
+            )
+            db.add(p2)
+        db.commit()
+        db.refresh(p1)
+        db.refresh(p2)
 
         print("Seeding Demo Users...")
         demo_users = [
@@ -88,6 +128,24 @@ def seed_demo_data(target_session=None, reset=False):
                 "full_name": "Apex Mobile Returns Rep",
                 "role": "RETAILER",
                 "organization_id": 2
+            },
+            {
+                "username": "driver_eco",
+                "email": "driver@ecologix.example",
+                "password": hash_password("Pickup123!"),
+                "full_name": "Dave Miller (EcoLogix Driver)",
+                "role": "PICKUP_PARTNER",
+                "organization_id": 3,
+                "pickup_partner_id": p1.id
+            },
+            {
+                "username": "driver_green",
+                "email": "driver@greenroute.example",
+                "password": hash_password("Pickup123!"),
+                "full_name": "Gary Smith (GreenRoute Driver)",
+                "role": "PICKUP_PARTNER",
+                "organization_id": 3,
+                "pickup_partner_id": p2.id
             }
         ]
 
@@ -101,6 +159,7 @@ def seed_demo_data(target_session=None, reset=False):
                     full_name=u["full_name"],
                     role=u["role"],
                     organization_id=u["organization_id"],
+                    pickup_partner_id=u.get("pickup_partner_id"),
                     is_active=True
                 )
                 db.add(user)
@@ -123,6 +182,9 @@ def seed_demo_data(target_session=None, reset=False):
                 serial_expected="SN-PXL-78901",
                 customer_pincode="94103",
                 return_reason="Intermittent touch lag, minor back scratch",
+                pickup_partner_id=p1.id,
+                pickup_status="ASSIGNED",
+                pickup_scheduled_date=datetime.utcnow(),
                 status="RETURN_REQUESTED",
                 created_at=datetime.utcnow()
             )
@@ -203,10 +265,10 @@ def seed_demo_data(target_session=None, reset=False):
             )
             db.add(assess3)
 
-            # Estimates for RET-1003
+            # Estimates for RET-1003 in Indian Rupees (INR)
             options = generate_recovery_options(
                 product_category="Smartphone",
-                base_resale_value=Decimal("450.00"),
+                base_resale_value=Decimal("36000.00"),
                 physical_condition="LOW_DAMAGE",
                 battery_health=91,
                 functional_passed=True
@@ -238,6 +300,45 @@ def seed_demo_data(target_session=None, reset=False):
                 details="Inspection complete and recovery options generated"
             )
             db.add(hist3)
+
+        # Return 4: Apex Mobile (Laptop assigned to GreenRoute 3PL)
+        ret4 = db.query(ReturnRequest).filter(ReturnRequest.id == "RET-1004").first()
+        if not ret4:
+            ret4 = ReturnRequest(
+                id="RET-1004",
+                order_ref="ORD-APX-8004",
+                organization_id=2,
+                product_category="Laptop",
+                product_name="Dell XPS 13 9310 16GB",
+                sku="DELL-XPS-13-SLV",
+                serial_expected="SN-XPS-55102",
+                customer_pincode="75001",
+                return_reason="Display backlight flicker occasionally",
+                pickup_partner_id=p2.id,
+                pickup_status="ASSIGNED",
+                pickup_scheduled_date=datetime.utcnow(),
+                status="RETURN_REQUESTED",
+                created_at=datetime.utcnow()
+            )
+            db.add(ret4)
+            hist4 = ReturnStatusHistory(
+                return_id="RET-1004",
+                old_status=None,
+                new_status="RETURN_REQUESTED",
+                actor_username="admin",
+                actor_role="ADMIN",
+                action="INITIAL_SEED",
+                details="Return request assigned to GreenRoute 3PL for pickup"
+            )
+            db.add(hist4)
+
+        # Synchronize PostgreSQL sequences for tables with auto-increment IDs
+        try:
+            db.execute(text("SELECT setval('organizations_id_seq', COALESCE((SELECT MAX(id) FROM organizations), 1));"))
+            db.execute(text("SELECT setval('pickup_partners_id_seq', COALESCE((SELECT MAX(id) FROM pickup_partners), 1));"))
+            db.execute(text("SELECT setval('users_id_seq', COALESCE((SELECT MAX(id) FROM users), 1));"))
+        except Exception:
+            pass
 
         db.commit()
         print("Demo database successfully seeded!")

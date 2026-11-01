@@ -8,6 +8,9 @@ def render_inspector_dashboard(token: str, user: dict):
     st.title("🔬 Electronics Inspection & Quality Dashboard")
     st.caption(f"Logged in as **{user['full_name']}** (`{user['username']}`) | Role: **{user['role']}**")
 
+    if "inspector_flash_msg" in st.session_state:
+        st.success(st.session_state.pop("inspector_flash_msg"))
+
     tabs = st.tabs([
         "1️⃣ Inspection & Estimates",
         "2️⃣ Processing Task Execution",
@@ -45,7 +48,10 @@ def render_inspector_dashboard(token: str, user: dict):
                     safety = st.text_input("Safety Concerns / Thermal Assessment", value="None. Normal operating temperature, battery unswollen.")
                     damage_notes = st.text_area("Detailed Damage Notes", value="Bezel scuffs, slight screen wear. High recovery potential with panel restoration.")
 
-                submit_insp = st.form_submit_button("Complete Inspection & Generate Recovery Estimates", use_container_width=True)
+                submit_insp = st.form_submit_button(
+                    "Complete Inspection & Generate Recovery Estimates",
+                    use_container_width=True
+                )
 
                 if submit_insp:
                     payload = {
@@ -58,8 +64,11 @@ def render_inspector_dashboard(token: str, user: dict):
                     }
                     try:
                         res = api_client.inspect_return(token, selected_ret["id"], payload)
-                        st.success(f"✅ Inspection completed for **{res['id']}**! Generated {len(res.get('cost_estimates', []))} recovery options.")
-                        st.info("The return is now in `AWAITING_APPROVAL` for retailer review.")
+                        st.session_state["inspector_flash_msg"] = (
+                            f"✅ Inspection completed for **{res['id']}**! Generated {len(res.get('cost_estimates', []))} recovery options. "
+                            "The return is now in `AWAITING_APPROVAL` for retailer review."
+                        )
+                        st.rerun()
                     except Exception as e:
                         st.error(f"Inspection failed: {e}")
 
@@ -85,16 +94,19 @@ def render_inspector_dashboard(token: str, user: dict):
 
                 col1, col2 = st.columns(2)
                 with col1:
-                    actual_repair = st.number_input("Actual Parts & Repair Cost ($)", min_value=0.0, value=62.50, step=1.0)
-                    actual_pack = st.number_input("Actual Packaging Cost ($)", min_value=0.0, value=7.50, step=0.5)
+                    actual_repair = st.number_input("Actual Parts & Repair Cost (₹)", min_value=0.0, value=5000.0, step=100.0)
+                    actual_pack = st.number_input("Actual Packaging Cost (₹)", min_value=0.0, value=600.0, step=50.0)
                 with col2:
-                    actual_labor = st.number_input("Actual Labor / Sanitization Labor ($)", min_value=0.0, value=20.00, step=1.0)
-                    actual_trans = st.number_input("Actual Transport Cost ($)", min_value=0.0, value=12.00, step=1.0)
+                    actual_labor = st.number_input("Actual Labor / Sanitization Labor (₹)", min_value=0.0, value=1600.0, step=100.0)
+                    actual_trans = st.number_input("Actual Transport Cost (₹)", min_value=0.0, value=960.0, step=50.0)
 
                 total_cost = actual_repair + actual_pack + actual_labor + actual_trans
-                st.markdown(f"**Total Actual Cost to Record:** `${total_cost:.2f}`")
+                st.markdown(f"**Total Actual Cost to Record:** `₹{total_cost:.2f}`")
 
-                submit_proc = st.form_submit_button("Complete Processing Task", use_container_width=True)
+                submit_proc = st.form_submit_button(
+                    "Complete Processing Task",
+                    use_container_width=True
+                )
 
                 if submit_proc:
                     payload = {
@@ -106,7 +118,11 @@ def render_inspector_dashboard(token: str, user: dict):
                     }
                     try:
                         res = api_client.process_return(token, selected_ret["id"], payload)
-                        st.success(f"✅ Processing task recorded for **{res['id']}**! Status: `{res['status']}`.")
+                        st.session_state["inspector_flash_msg"] = (
+                            f"✅ Processing task recorded for **{res['id']}**! Status: `{res['status']}`. "
+                            "Item is now ready for final QC & Sanitization."
+                        )
+                        st.rerun()
                     except Exception as e:
                         st.error(f"Processing failed: {e}")
 
@@ -137,7 +153,10 @@ def render_inspector_dashboard(token: str, user: dict):
                 cosmetic_grade = st.selectbox("Cosmetic Grade Assigned", ["GRADE_A", "GRADE_B", "GRADE_C"])
                 qc_notes = st.text_area("Quality Inspector Certification Notes", value="Passed all optical and functional tests. Battery capacity >85%. Resale ready.")
 
-                submit_qc = st.form_submit_button("Certify Quality Check", use_container_width=True)
+                submit_qc = st.form_submit_button(
+                    "Certify Quality Check",
+                    use_container_width=True
+                )
 
                 if submit_qc:
                     payload = {
@@ -150,8 +169,11 @@ def render_inspector_dashboard(token: str, user: dict):
                     }
                     try:
                         res = api_client.qc_return(token, selected_ret["id"], payload)
-                        st.success(f"✅ Quality Check Certified for **{res['id']}**! Status: `{res['status']}`.")
-                        st.info("Product is now cleared for restocking.")
+                        st.session_state["inspector_flash_msg"] = (
+                            f"✅ Quality Check Certified for **{res['id']}**! Status: `{res['status']}`. "
+                            "Product is now cleared for restocking."
+                        )
+                        st.rerun()
                     except Exception as e:
                         st.error(f"QC Certification failed: {e}")
 

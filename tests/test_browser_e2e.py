@@ -10,6 +10,8 @@ ACCOUNTS = [
     ("inspector", "Inspector123!", "Electronics Inspection & Quality Dashboard"),
     ("retailer_tech", "Retailer123!", "Retailer Representative Portal"),
     ("retailer_apex", "Retailer123!", "Retailer Representative Portal"),
+    ("driver_eco", "Pickup123!", "Pickup Partner Field Logistics Portal"),
+    ("driver_green", "Pickup123!", "Pickup Partner Field Logistics Portal"),
 ]
 
 def test_browser_login_all_accounts():

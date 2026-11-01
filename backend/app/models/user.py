@@ -26,9 +26,11 @@ class User(Base):
     email = Column(String(255), unique=True, nullable=False, index=True)
     hashed_password = Column(String(255), nullable=False)
     full_name = Column(String(255), nullable=False)
-    role = Column(String(50), nullable=False, index=True)  # ADMIN, WAREHOUSE, INSPECTOR, RETAILER
+    role = Column(String(50), nullable=False, index=True)  # ADMIN, WAREHOUSE, INSPECTOR, RETAILER, PICKUP_PARTNER
     organization_id = Column(Integer, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True)
+    pickup_partner_id = Column(Integer, ForeignKey("pickup_partners.id", ondelete="SET NULL"), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     organization = relationship("Organization", back_populates="users")
+    pickup_partner = relationship("PickupPartner", back_populates="users")

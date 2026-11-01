@@ -11,11 +11,14 @@ class Token(BaseModel):
     username: str
     organization_id: Optional[int] = None
     organization_name: Optional[str] = None
+    pickup_partner_id: Optional[int] = None
+    pickup_partner_name: Optional[str] = None
 
 class TokenData(BaseModel):
     username: Optional[str] = None
     role: Optional[str] = None
     organization_id: Optional[int] = None
+    pickup_partner_id: Optional[int] = None
 
 class LoginRequest(BaseModel):
     username_or_email: str
@@ -29,6 +32,8 @@ class UserResponse(BaseModel):
     role: str
     organization_id: Optional[int] = None
     organization_name: Optional[str] = None
+    pickup_partner_id: Optional[int] = None
+    pickup_partner_name: Optional[str] = None
     is_active: bool
     created_at: datetime
 
@@ -39,5 +44,6 @@ class UserCreate(BaseModel):
     email: EmailStr
     password: str
     full_name: str
-    role: str  # ADMIN, WAREHOUSE, INSPECTOR, RETAILER
+    role: str  # ADMIN, WAREHOUSE, INSPECTOR, RETAILER, PICKUP_PARTNER
     organization_id: Optional[int] = None
+    pickup_partner_id: Optional[int] = None

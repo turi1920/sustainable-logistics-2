@@ -9,6 +9,7 @@ def test_full_smartphone_return_lifecycle(client):
     warehouse_token = get_token(client, "warehouse", "Warehouse123!")
     inspector_token = get_token(client, "inspector", "Inspector123!")
     retailer_token = get_token(client, "retailer_tech", "Retailer123!")
+    driver_token = get_token(client, "driver_eco", "Pickup123!")
 
     # 1. Register a new smartphone return (Step 6)
     reg_payload = {
@@ -20,7 +21,8 @@ def test_full_smartphone_return_lifecycle(client):
         "sku": "SM-S908B-BLK",
         "serial_expected": "SN-S22U-7721",
         "customer_pincode": "94103",
-        "return_reason": "Screen flickering, minor edge scuffs"
+        "return_reason": "Screen flickering, minor edge scuffs",
+        "pickup_partner_id": 1  # Assigned to EcoLogix Express
     }
     reg_resp = client.post(
         "/api/returns",
@@ -32,6 +34,33 @@ def test_full_smartphone_return_lifecycle(client):
     return_id = ret_data["id"]
     assert ret_data["status"] == "RETURN_REQUESTED"
     assert ret_data["product_category"] == "Smartphone"
+    assert ret_data["pickup_status"] == "ASSIGNED"
+
+    # Phase sequencing check: Attempting to receive before pickup must fail with 400
+    early_recv = client.post(
+        f"/api/returns/{return_id}/receive",
+        headers={"Authorization": f"Bearer {warehouse_token}"},
+        json={"serial_received": "SN-S22U-7721", "storage_location": "Aisle 3, Bin W-302"}
+    )
+    assert early_recv.status_code == 400
+    assert "Phase Sequencing Violation" in early_recv.json()["detail"]
+
+    # 1.5. Driver picks up device from customer doorstep and delivers to warehouse dock
+    collect_resp = client.post(
+        f"/api/returns/{return_id}/confirm-pickup",
+        headers={"Authorization": f"Bearer {driver_token}"},
+        json={"picked_up_notes": "Device received from customer in protective padded pouch."}
+    )
+    assert collect_resp.status_code == 200
+    assert collect_resp.json()["pickup_status"] == "IN_TRANSIT"
+
+    deliver_resp = client.post(
+        f"/api/returns/{return_id}/deliver-warehouse",
+        headers={"Authorization": f"Bearer {driver_token}"},
+        json={"delivery_notes": "Delivered to warehouse intake bay 3."}
+    )
+    assert deliver_resp.status_code == 200
+    assert deliver_resp.json()["pickup_status"] == "DELIVERED_TO_WAREHOUSE"
 
     # 2. Confirm warehouse receipt (Step 7)
     recv_payload = {
@@ -88,13 +117,13 @@ def test_full_smartphone_return_lifecycle(client):
     assert dec_resp.status_code == 200, f"Failed decision: {dec_resp.text}"
     assert dec_resp.json()["status"] == "APPROVED"
 
-    # 5. Complete technical processing task and record ACTUAL costs (Step 11 & Step 15)
+    # 5. Complete technical processing task and record ACTUAL costs in INR (Step 11 & Step 15)
     proc_payload = {
         "work_performed": "Replaced glass surface layer, recalibrated battery, flashed factory firmware.",
-        "actual_repair_cost": 62.50,
-        "actual_packaging_cost": 7.50,
-        "actual_labor_cost": 20.00,
-        "actual_transport_cost": 12.00
+        "actual_repair_cost": 5000.00,
+        "actual_packaging_cost": 600.00,
+        "actual_labor_cost": 1600.00,
+        "actual_transport_cost": 960.00
     }
     proc_resp = client.post(
         f"/api/returns/{return_id}/process",
@@ -105,8 +134,8 @@ def test_full_smartphone_return_lifecycle(client):
     proc_data = proc_resp.json()
     assert proc_data["status"] == "PROCESSING_COMPLETED"
     pt = proc_data["processing_task"]
-    assert float(pt["actual_repair_cost"]) == 62.50
-    assert float(pt["total_actual_cost"]) == 102.00  # 62.50 + 7.50 + 20.00 + 12.00
+    assert float(pt["actual_repair_cost"]) == 5000.00
+    assert float(pt["total_actual_cost"]) == 8160.00  # 5000 + 600 + 1600 + 960
 
     # 6. Perform required Quality Check & verify Data Sanitization Gate (Step 12)
     qc_payload = {
@@ -129,7 +158,7 @@ def test_full_smartphone_return_lifecycle(client):
     restock_payload = {
         "disposition_type": "RESTOCKED",
         "inventory_location": "SHELF-RESALE-S22-01",
-        "realized_resale_value": 375.00,
+        "realized_resale_value": 30000.00,
         "notes": "Added to secondary resale catalog."
     }
     restock_resp = client.post(
@@ -174,6 +203,6 @@ def test_full_smartphone_return_lifecycle(client):
 
     # Has separate actual costs
     actual = detail["processing_task"]
-    assert float(actual["actual_repair_cost"]) == 62.50
-    assert float(actual["total_actual_cost"]) == 102.00
-    assert float(detail["disposition"]["realized_resale_value"]) == 375.00
+    assert float(actual["actual_repair_cost"]) == 5000.00
+    assert float(actual["total_actual_cost"]) == 8160.00
+    assert float(detail["disposition"]["realized_resale_value"]) == 30000.00
