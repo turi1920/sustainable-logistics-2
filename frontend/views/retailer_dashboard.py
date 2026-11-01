@@ -16,7 +16,15 @@ def render_retailer_dashboard(token: str, user: dict):
 
     st.info(f"🔒 Tenant Isolation Active: Viewing records exclusively for **{org_name}**.")
 
-    tabs = st.tabs(["⏳ Pending Recovery Approvals", "📋 All Retailer Returns", "🌱 Sustainability Impact", "🔍 Return Case Journey"])
+    tab_labels = ["⏳ Pending Recovery Approvals", "📋 All Retailer Returns", "🌱 Sustainability Impact", "🔍 Return Case Journey"]
+    saved_tab = st.query_params.get("tab")
+    default_tab = tab_labels[0]
+    if saved_tab:
+        for lbl in tab_labels:
+            if saved_tab == lbl or saved_tab.lower() in lbl.lower() or lbl.lower() in saved_tab.lower():
+                default_tab = lbl
+                break
+    tabs = st.tabs(tab_labels, default=default_tab)
 
     # Tab 1: Pending Approvals
     with tabs[0]:

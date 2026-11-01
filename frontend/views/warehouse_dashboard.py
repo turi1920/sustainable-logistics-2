@@ -12,8 +12,14 @@ def render_warehouse_dashboard(token: str, user: dict):
         st.success(st.session_state.pop("warehouse_flash_msg"))
 
     tab_labels = ["📥 Warehouse Intake (Confirm Receipt)", "🏷️ Restock & Dispatch Queue", "🔍 Case Traceability"]
+    saved_tab = st.query_params.get("tab")
     default_tab = tab_labels[0]
-    if st.session_state.get("journey_search_input"):
+    if saved_tab:
+        for lbl in tab_labels:
+            if saved_tab == lbl or saved_tab.lower() in lbl.lower() or lbl.lower() in saved_tab.lower():
+                default_tab = lbl
+                break
+    elif st.session_state.get("journey_search_input"):
         default_tab = "🔍 Case Traceability"
     tabs = st.tabs(tab_labels, default=default_tab)
 

@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 
 import sys
 from pathlib import Path
@@ -30,10 +31,52 @@ if "user" not in st.session_state:
 if "current_view" not in st.session_state:
     st.session_state.current_view = None
 
+def get_allowed_views(role: str) -> list:
+    if role == "ADMIN":
+        return [
+            "Admin Dashboard",
+            "Warehouse Dashboard",
+            "Inspector Dashboard",
+            "Retailer Portal",
+            "Pickup Partner Portal",
+        ]
+    elif role == "WAREHOUSE":
+        return ["Warehouse Dashboard"]
+    elif role == "INSPECTOR":
+        return ["Inspector Dashboard"]
+    elif role == "RETAILER":
+        return ["Retailer Portal"]
+    elif role == "PICKUP_PARTNER":
+        return ["Pickup Partner Portal"]
+    return []
+
+# Restore session from URL query params on page reload (F5 / Refresh)
+if not st.session_state.token:
+    token_from_url = st.query_params.get("session_token")
+    if token_from_url:
+        try:
+            user_profile = api_client.get_me(token_from_url)
+            st.session_state.token = token_from_url
+            st.session_state.user = user_profile
+            allowed = get_allowed_views(user_profile.get("role", ""))
+            saved_view = st.query_params.get("view")
+            if saved_view and saved_view in allowed:
+                st.session_state.current_view = saved_view
+            elif allowed:
+                st.session_state.current_view = allowed[0]
+                st.query_params["view"] = allowed[0]
+        except Exception:
+            # Token invalid, expired, or server restarted: clear query params
+            st.query_params.clear()
+            st.session_state.token = None
+            st.session_state.user = None
+            st.session_state.current_view = None
+
 def handle_logout():
     st.session_state.token = None
     st.session_state.user = None
     st.session_state.current_view = None
+    st.query_params.clear()
     st.rerun()
 
 # ----------------- LOGIN SCREEN -----------------
@@ -61,19 +104,15 @@ if not st.session_state.token or not st.session_state.user:
 
                         st.session_state.token = token
                         st.session_state.user = user_profile
+                        st.query_params["session_token"] = token
 
                         # Role-based redirection
                         role = user_profile["role"]
-                        if role == "ADMIN":
-                            st.session_state.current_view = "Admin Dashboard"
-                        elif role == "WAREHOUSE":
-                            st.session_state.current_view = "Warehouse Dashboard"
-                        elif role == "INSPECTOR":
-                            st.session_state.current_view = "Inspector Dashboard"
-                        elif role == "RETAILER":
-                            st.session_state.current_view = "Retailer Portal"
-                        elif role == "PICKUP_PARTNER":
-                            st.session_state.current_view = "Pickup Partner Portal"
+                        allowed = get_allowed_views(role)
+                        default_view = allowed[0] if allowed else None
+                        st.session_state.current_view = default_view
+                        if default_view:
+                            st.query_params["view"] = default_view
 
                         st.success(f"Welcome, {user_profile['full_name']}!")
                         st.rerun()
@@ -116,38 +155,55 @@ else:
         st.markdown("---")
 
         # Navigation with Strict RBAC Route Protection
-        available_views = []
-        if role == "ADMIN":
-            available_views = [
-                "Admin Dashboard",
-                "Warehouse Dashboard",
-                "Inspector Dashboard",
-                "Retailer Portal",
-                "Pickup Partner Portal"
-            ]
-        elif role == "WAREHOUSE":
-            available_views = ["Warehouse Dashboard"]
-        elif role == "INSPECTOR":
-            available_views = ["Inspector Dashboard"]
-        elif role == "RETAILER":
-            available_views = ["Retailer Portal"]
-        elif role == "PICKUP_PARTNER":
-            available_views = ["Pickup Partner Portal"]
+        available_views = get_allowed_views(role)
 
         # Ensure current view matches allowed role
         if st.session_state.current_view not in available_views:
             st.session_state.current_view = available_views[0]
 
         if len(available_views) > 1:
-            st.session_state.current_view = st.selectbox(
+            selected_view = st.selectbox(
                 "Navigation",
                 options=available_views,
                 index=available_views.index(st.session_state.current_view)
             )
+            if selected_view != st.session_state.current_view:
+                st.session_state.current_view = selected_view
+                st.query_params["view"] = selected_view
+                if "tab" in st.query_params:
+                    del st.query_params["tab"]
+                st.rerun()
+            else:
+                st.query_params["view"] = selected_view
+        elif available_views:
+            st.query_params["view"] = available_views[0]
 
         st.markdown("---")
         if st.button("🚪 Logout", use_container_width=True):
             handle_logout()
+
+    # Inject client-side tab synchronization script to persist active tabs across reloads
+    components.html("""
+    <script>
+    const doc = window.parent.document;
+    function syncTabs() {
+        const tabs = doc.querySelectorAll('button[role="tab"]');
+        tabs.forEach((tab) => {
+            if (!tab.dataset.tabSyncAttached) {
+                tab.dataset.tabSyncAttached = "true";
+                tab.addEventListener('click', () => {
+                    const tabText = tab.innerText.split('\\n')[0].trim();
+                    const url = new URL(window.parent.location.href);
+                    url.searchParams.set('tab', tabText);
+                    window.parent.history.replaceState(null, '', url.toString());
+                });
+            }
+        });
+    }
+    syncTabs();
+    setInterval(syncTabs, 300);
+    </script>
+    """, height=0, width=0)
 
     # Route Enforcement & View Dispatch
     current_view = st.session_state.current_view

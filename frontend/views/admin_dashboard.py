@@ -24,9 +24,16 @@ def render_admin_dashboard(token: str, user: dict):
         "🌱 Sustainability Impact",
         "🔍 Traceability & Audit",
     ]
+    saved_tab = st.query_params.get("tab")
     default_tab = tab_labels[0]
-    if st.session_state.get("journey_search_input"):
+    if saved_tab:
+        for lbl in tab_labels:
+            if saved_tab == lbl or saved_tab.lower() in lbl.lower() or lbl.lower() in saved_tab.lower():
+                default_tab = lbl
+                break
+    elif st.session_state.get("journey_search_input"):
         default_tab = "🔍 Traceability & Audit"
+
     tabs = st.tabs(tab_labels, default=default_tab)
 
     # ==========================================
@@ -251,6 +258,7 @@ def render_admin_dashboard(token: str, user: dict):
                         try:
                             created = api_client.create_user(token, payload)
                             st.session_state["user_flash_msg"] = f"✅ User **{created['username']}** created successfully with role `{created['role']}`!"
+                            st.query_params["tab"] = "👥 User Management"
                             st.rerun()
                         except Exception as e:
                             st.error(f"Failed to create user: {e}")
@@ -288,6 +296,7 @@ def render_admin_dashboard(token: str, user: dict):
                             try:
                                 res = api_client.delete_user(token, user_to_delete["id"])
                                 st.session_state["user_flash_msg"] = f"✅ {res.get('message', 'User deleted successfully!')}"
+                                st.query_params["tab"] = "👥 User Management"
                                 st.rerun()
                             except Exception as e:
                                 st.error(f"Failed to delete user: {e}")
@@ -305,6 +314,7 @@ def render_admin_dashboard(token: str, user: dict):
                     try:
                         res = api_client.toggle_user_active(token, user_to_toggle["id"])
                         st.session_state["user_flash_msg"] = f"✅ {res.get('message', 'Status updated!')}"
+                        st.query_params["tab"] = "👥 User Management"
                         st.rerun()
                     except Exception as e:
                         st.error(f"Failed to toggle status: {e}")
@@ -394,6 +404,7 @@ def render_admin_dashboard(token: str, user: dict):
                         try:
                             created_d = api_client.create_user(token, payload)
                             st.session_state["partner_flash_msg"] = f"✅ Pickup Driver **{created_d['username']}** ({created_d['full_name']}) added successfully!"
+                            st.query_params["tab"] = "🚚 Pickup Partners & Dispatch"
                             st.rerun()
                         except Exception as e:
                             st.error(f"Failed to create driver: {e}")
@@ -439,6 +450,7 @@ def render_admin_dashboard(token: str, user: dict):
                             res = api_client.assign_pickup_partner(token, target_return["id"], payload)
                             dest_name = chosen_dest["name"]
                             st.session_state["partner_flash_msg"] = f"✅ Return **{res['id']}** dispatched to **{dest_name}**!"
+                            st.query_params["tab"] = "🚚 Pickup Partners & Dispatch"
                             st.rerun()
                         except Exception as e:
                             st.error(f"Failed to dispatch return: {e}")
@@ -467,6 +479,7 @@ def render_admin_dashboard(token: str, user: dict):
                             try:
                                 res = api_client.delete_user(token, driver_to_delete["id"])
                                 st.session_state["partner_flash_msg"] = f"✅ {res.get('message', 'Driver removed successfully!')}"
+                                st.query_params["tab"] = "🚚 Pickup Partners & Dispatch"
                                 st.rerun()
                             except Exception as e:
                                 st.error(f"Failed to delete driver: {e}")

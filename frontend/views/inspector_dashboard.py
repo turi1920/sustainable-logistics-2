@@ -11,12 +11,20 @@ def render_inspector_dashboard(token: str, user: dict):
     if "inspector_flash_msg" in st.session_state:
         st.success(st.session_state.pop("inspector_flash_msg"))
 
-    tabs = st.tabs([
+    tab_labels = [
         "1️⃣ Inspection & Estimates",
         "2️⃣ Processing Task Execution",
         "3️⃣ Quality Check & Sanitization",
-        "🔍 Case Search"
-    ])
+        "🔍 Case Search",
+    ]
+    saved_tab = st.query_params.get("tab")
+    default_tab = tab_labels[0]
+    if saved_tab:
+        for lbl in tab_labels:
+            if saved_tab == lbl or saved_tab.lower() in lbl.lower() or lbl.lower() in saved_tab.lower():
+                default_tab = lbl
+                break
+    tabs = st.tabs(tab_labels, default=default_tab)
 
     # Tab 1: Inspection & Estimates
     with tabs[0]:
