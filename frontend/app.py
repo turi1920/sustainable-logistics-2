@@ -1,5 +1,14 @@
 import streamlit as st
 
+import sys
+from pathlib import Path
+
+# Ensure the repository root is available for package imports.
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 from frontend.api_client import api_client
 from frontend.views.admin_dashboard import render_admin_dashboard
 from frontend.views.inspector_dashboard import render_inspector_dashboard
